@@ -6,6 +6,11 @@
 #include <linux/ctype.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
+#define f_dentry f_path.dentry
+#endif
 
 const struct file_operations ftp_fs_file_operations = {
     .read = ftp_fs_read,
@@ -116,13 +121,13 @@ int ftp_fs_iterate(struct file* f, struct dir_context* ctx) {
             q.name = files[i].name;
             q.len = strlen(files[i].name);
             q.hash = full_name_hash(q.name, q.len);
-            
+
             /* if the fake dentry exists, just skip it */
             if ((fake_dentry = d_lookup(dentry, &q)) != NULL) {
                 dput(fake_dentry);
                 continue;
             }
-            
+
             /* allocate a fake dentry corresponding a remote file */
             fake_dentry= d_alloc_name(dentry, files[i].name);
 
@@ -204,4 +209,3 @@ int ftp_fs_close(struct inode* inode, struct file* file) {
     kfree(path_buf);
     return 0;
 }
-

@@ -3,6 +3,7 @@
 #include <linux/slab.h>
 #include <linux/ctype.h>
 #include <linux/time.h>
+#include <linux/stat.h>
 
 int ftp_info_init(struct ftp_info **info, struct sockaddr_in addr, const char *user, const char *pass, int max_sock) {
     *info = (struct ftp_info*)kmalloc(sizeof(struct ftp_info), GFP_KERNEL);
