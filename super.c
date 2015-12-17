@@ -11,7 +11,9 @@ const struct super_operations ftp_fs_ops = {
 };
 
 int ftp_fs_fill_super(struct super_block *sb, void *data, int silent) {
-    struct inode* inode;
+    struct inode *inode;
+    struct sockaddr_in *addr;
+    struct ftp_info *ftp_info;
 
     pr_debug("begin ftp_fs_fill_super\n");
 
@@ -26,9 +28,8 @@ int ftp_fs_fill_super(struct super_block *sb, void *data, int silent) {
     /* initialize the gloabl ftp_info including the socket informations
      * and point the sb->s_fs_info to it */
 
-    struct sockaddr_in *addr = cons_addr(FTP_IP);
+    addr = cons_addr(FTP_IP);
     if (addr == NULL) return -1;
-    struct ftp_info *ftp_info;
     if (ftp_info_init(&ftp_info, *addr, FTP_USERNAME, FTP_PASSWORD, MAX_SOCK) == -1) {
         kfree(addr);
         return -1;
@@ -60,4 +61,3 @@ struct file_system_type ftp_fs_type = {
     .mount = ftp_fs_mount,
     .kill_sb = ftp_fs_umount,
 };
-

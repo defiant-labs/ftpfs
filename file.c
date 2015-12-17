@@ -28,13 +28,15 @@ const struct file_operations ftp_fs_dir_operations = {
 ssize_t ftp_fs_read(struct file* f, char __user *buf, size_t count, loff_t *offset) {
     ssize_t content_size = -1;
     struct dentry *dentry = f->f_dentry;
+    char *path_buf;
+    char *full_path;
 
     /* allocate the buffer to store the full path */
     pr_debug("begin to read\n");
-    char *path_buf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
+    path_buf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
     if (path_buf == NULL)
         goto error0;
-    char *full_path = dentry_path_raw(dentry, path_buf, MAX_PATH_LEN);
+    full_path = dentry_path_raw(dentry, path_buf, MAX_PATH_LEN);
 
     /* read the file */
     pr_debug("file name is: %s\n", full_path);
@@ -42,9 +44,11 @@ ssize_t ftp_fs_read(struct file* f, char __user *buf, size_t count, loff_t *offs
     content_size = ftp_read_file((struct ftp_info*) f->f_inode->i_sb->s_fs_info, full_path, *offset, buf, count);
 
     pr_debug("recieved content size: %lu\n", content_size);
-    if (content_size != -1) *offset += content_size;
+    if (content_size != -1)
+        *offset += content_size;
 
     kfree(path_buf);
+
 error0:
     return content_size;
 }
@@ -52,13 +56,15 @@ error0:
 ssize_t ftp_fs_write(struct file* f, const char __user *buf, size_t count, loff_t* offset) {
     ssize_t content_size = -1;
     struct dentry *dentry = f->f_dentry;
+    char *path_buf;
+    char *full_path;
 
     /* allocate the buffer to store the full path */
     pr_debug("begin to write\n");
-    char *path_buf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
+    path_buf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
     if (path_buf == NULL)
         goto error0;
-    char *full_path = dentry_path_raw(dentry, path_buf, MAX_PATH_LEN);
+    full_path = dentry_path_raw(dentry, path_buf, MAX_PATH_LEN);
 
     /* write the file */
     pr_debug("file name is: %s\n", full_path);
@@ -87,37 +93,43 @@ inline int simple_positive(struct dentry *dentry) {
 }
 
 int ftp_fs_iterate(struct file* f, struct dir_context* ctx) {
+    int result = -1;
+    struct dentry *dentry = f->f_dentry;
+    char *path_buf;
+    char *full_path;
+    unsigned long file_num;
+    struct ftp_file_info *files;
+
     pr_debug("begin to iterate\n");
     if (!dir_emit_dots(f, ctx)) {
         pr_debug("emit dot failed\n");
         return 0;
     }
 
-    int result = -1;
-    struct dentry *dentry = f->f_dentry;
-
     /* get the full path for the file */
-    char *path_buf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
+    path_buf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
     if (path_buf == NULL)
         goto error0;
-    char *full_path = dentry_path_raw(dentry, path_buf, MAX_PATH_LEN);
+    full_path = dentry_path_raw(dentry, path_buf, MAX_PATH_LEN);
 
     pr_debug("file name is: %s\n", full_path);
 
-    unsigned long file_num;
-    struct ftp_file_info *files;
     pr_debug("try to connect ftp server\n");
     if ((result = ftp_read_dir((struct ftp_info*) f->f_inode->i_sb->s_fs_info, full_path, &file_num, &files)) == 0) {
+        struct fake_dentry_list *fake_dentry_head = NULL, *fake_dentry_last = NULL;
+        int i;
+        struct dentry *fake_dentry;
+        struct qstr q;
+        struct fake_dentry_list *tmp;
+        struct fake_dentry_list *ptr;
+        struct fake_dentry_list *next;
+
         pr_debug("got %lu files under the dir\n", file_num);
 
-        struct fake_dentry_list *fake_dentry_head = NULL, *fake_dentry_last = NULL;
         /* allocate fake inodes */
-        int i;
         for (i = 2 /* omit the . and .. */ ; i < file_num; i++) {
             pr_debug("the fake dentry name is %s\n", files[i].name);
 
-            struct dentry *fake_dentry;
-            struct qstr q;
             q.name = files[i].name;
             q.len = strlen(files[i].name);
             q.hash = full_name_hash(q.name, q.len);
@@ -153,7 +165,7 @@ int ftp_fs_iterate(struct file* f, struct dir_context* ctx) {
             fake_dentry->d_inode->i_size = files[i].size;
 
             /* update the list */
-            struct fake_dentry_list* tmp = (struct fake_dentry_list*) kmalloc(sizeof(struct fake_dentry_list), GFP_KERNEL);
+            tmp = (struct fake_dentry_list*) kmalloc(sizeof(struct fake_dentry_list), GFP_KERNEL);
             if (tmp == NULL) {
                 pr_debug("allocate fake_dentry_list node failed\n");
                 result = -1;
@@ -173,11 +185,10 @@ int ftp_fs_iterate(struct file* f, struct dir_context* ctx) {
 out:
         /* free the fake dentry */
         pr_debug("fake dentry lists: \n");
-        struct fake_dentry_list *ptr;
         for (ptr = fake_dentry_head; ptr;) {
             pr_debug("    %s\n", ptr->dentry->d_name.name);
             simple_unlink(dentry->d_inode, ptr->dentry);
-            struct fake_dentry_list *next = ptr->next;
+            next = ptr->next;
             kfree(ptr);
             ptr = next;
         }
@@ -188,24 +199,33 @@ out:
     kfree(path_buf);
 error0:
     pr_debug("iterate result is %d\n", result);
+
     return result;
 }
 
 int ftp_fs_dir_open(struct inode* inode, struct file* file) {
-    pr_debug("opened file\n");
     /* set the current dir at this dir */
     static struct qstr cursor_name = QSTR_INIT(".", 1);
+
+    pr_debug("opened file\n");
+
     file->private_data = d_alloc(file->f_path.dentry, &cursor_name);
+
     return file->private_data ? 0 : -ENOMEM;
 }
 
 int ftp_fs_close(struct inode* inode, struct file* file) {
     char *path_buf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
+    char *full_path;
+
     if (path_buf == NULL)
         return 0;
+
     /* get the full path */
-    char *full_path = dentry_path_raw(file->f_dentry, path_buf, MAX_PATH_LEN);
+    full_path = dentry_path_raw(file->f_dentry, path_buf, MAX_PATH_LEN);
     ftp_close_file((struct ftp_info*) inode->i_sb->s_fs_info, full_path);
+
     kfree(path_buf);
+
     return 0;
 }

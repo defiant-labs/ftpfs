@@ -74,7 +74,15 @@ int ftp_fs_mknod(struct inode* dir, struct dentry* dentry, umode_t mode, dev_t d
 }
 
 struct dentry* ftp_fs_lookup(struct inode* inode, struct dentry* dentry, unsigned int flags) {
-    struct inode* target = NULL;
+    struct inode *target = NULL;
+    struct dentry *d;
+    char *filename;
+    char *filebuf;
+    char *file_path;
+    int result = -1;
+    unsigned long file_num;
+    struct ftp_file_info *files;
+    int i;
 
     pr_debug("process lookup %s\n", dentry->d_name.name);
     if (dentry->d_name.len > NAME_MAX)
@@ -83,29 +91,24 @@ struct dentry* ftp_fs_lookup(struct inode* inode, struct dentry* dentry, unsigne
         d_set_d_op(dentry, &simple_dentry_operations);
 
     /* got the full path from inode */
-    struct dentry *d = list_entry(inode->i_dentry.first, struct dentry, d_alias);
-    char *filename = dentry->d_name.name;
-    char *filebuf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
+    d = list_entry(inode->i_dentry.first, struct dentry, d_alias);
+    filename = (char*) dentry->d_name.name;
+    filebuf = (char*) kmalloc(MAX_PATH_LEN, GFP_KERNEL);
     if (filebuf == NULL) {
         pr_debug("allocate filebuf failed\n");
         goto out;
     }
-    char *file_path = dentry_path_raw(d, filebuf, MAX_PATH_LEN);
+    file_path = dentry_path_raw(d, filebuf, MAX_PATH_LEN);
     if (file_path == NULL) {
         pr_debug("calculate file path failed\n");
         goto error;
     }
     pr_debug("@lookup full path name %s\n", filename);
 
-    int result = -1;
-    unsigned long file_num;
-    struct ftp_file_info *files;
-
     /* fetch the dir content from the server and the look up the file in the content. If it exists, then allocate a dentry cache for it
      * if not, the target is set as NULL and d_add it */
     if ((result = ftp_read_dir((struct ftp_info*) inode->i_sb->s_fs_info, file_path, &file_num, &files)) == 0) {
         pr_debug("got %lu file\n", file_num);
-        int i;
         for (i = 2; i < file_num; i++) if (strcmp(filename, files[i].name) == 0) {
             pr_debug("got this file\n");
             if ((target = ftp_fs_get_inode(inode->i_sb, inode, files[i].mode, 0)) == NULL) {

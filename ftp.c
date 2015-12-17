@@ -495,7 +495,7 @@ int ftp_read_dir(struct ftp_info *info, const char *path, unsigned long *len, st
     static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     struct ftp_conn_info *conn;
     struct ftp_file_info *tmp_files;
-    int ret, i, current_year, year, month, day, hour, min;
+    int ret = 0, i = 0, current_year = 0, year = 0, month = 0, day = 0, hour = 0, min = 0;
     unsigned long tmp_len, buf_len, tmp;
     struct timeval time;
     struct tm tm;

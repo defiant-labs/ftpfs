@@ -93,7 +93,7 @@ int sock_readline(struct socket *sock, char **buf) {
 static unsigned short _htons(unsigned short port) {
     unsigned short s0 = port & (unsigned short)0x00ff;
     unsigned short s1 = port & (unsigned short)0xff00;
-    pr_debug("got the port %lu\n", (s0 << 8) + s1);
+    pr_debug("got the port %d\n", (s0 << 8) + s1);
     return (s0 << 8) + s1;
 }
 

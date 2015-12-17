@@ -5,15 +5,14 @@ FTP file system
 Usage
 ==============
 # build the kernel
-make 
+make
 # load the module into kernel
-sudo insmod ftpfs.ko 
+sudo insmod ftpfs.ko
 # mount this filesystem
-sudo mount -t ftpfs none /mnt 
+sudo mount -t ftpfs none /mnt
 # ls command
-sudo ls /mnt 
+sudo ls /mnt
 # read a file
-sudo cat /mnt/ftp/test.txt 
+sudo cat /mnt/ftp/test.txt
 # write a file
-sudo echo "hello world!" | sudo tee /mnt/ftp/test.txt 
-
+sudo echo "hello world!" | sudo tee /mnt/ftp/test.txt
