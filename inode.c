@@ -4,6 +4,11 @@
 #include "super.h"
 #include "file.h"
 #include <linux/mount.h>
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)
+#define d_alias d_u.d_alias
+#endif
 
 const struct inode_operations ftp_fs_file_inode_operations = {
     .setattr = simple_setattr,
@@ -96,7 +101,7 @@ struct dentry* ftp_fs_lookup(struct inode* inode, struct dentry* dentry, unsigne
     unsigned long file_num;
     struct ftp_file_info *files;
 
-    /* fetch the dir content from the server and the look up the file in the content. If it exists, then allocate a dentry cache for it 
+    /* fetch the dir content from the server and the look up the file in the content. If it exists, then allocate a dentry cache for it
      * if not, the target is set as NULL and d_add it */
     if ((result = ftp_read_dir((struct ftp_info*) inode->i_sb->s_fs_info, file_path, &file_num, &files)) == 0) {
         pr_debug("got %lu file\n", file_num);
@@ -123,4 +128,3 @@ out:
     pr_debug("add dentry\n");
     return NULL;
 }
-

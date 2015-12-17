@@ -5,6 +5,7 @@
 #include <linux/net.h>
 #include <linux/slab.h>
 #include <linux/in.h>
+#include <linux/version.h>
 
 int sock_send(struct socket *sock, const void *buf, int len) {
     struct iovec iov;
@@ -16,9 +17,17 @@ int sock_send(struct socket *sock, const void *buf, int len) {
     iov.iov_base = (void*)buf;
     iov.iov_len = len;
     memset(&msg, 0, sizeof(msg));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
+#else
+    iov_iter_init(&msg.msg_iter, WRITE, &iov, 1, len);
+#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0)
     ret = sock_sendmsg(sock, &msg, len);
+#else
+    ret = sock_sendmsg(sock, &msg);
+#endif
 
     set_fs(old_fs);
     return ret;
@@ -34,8 +43,12 @@ int sock_recv(struct socket *sock, void *buf, int size) {
     iov.iov_base = buf;
     iov.iov_len = size;
     memset(&msg, 0, sizeof(msg));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
+#else
+    iov_iter_init(&msg.msg_iter, READ, &iov, 1, 1);
+#endif
     ret = sock_recvmsg(sock, &msg, size, 0);
 
     set_fs(old_fs);
@@ -79,7 +92,7 @@ int sock_readline(struct socket *sock, char **buf) {
 
 static unsigned short _htons(unsigned short port) {
     unsigned short s0 = port & (unsigned short)0x00ff;
-    unsigned short s1 = port & (unsigned short)0xff00; 
+    unsigned short s1 = port & (unsigned short)0xff00;
     pr_debug("got the port %lu\n", (s0 << 8) + s1);
     return (s0 << 8) + s1;
 }
